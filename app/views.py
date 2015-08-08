@@ -79,25 +79,31 @@ def selector(request):
         no_exists = False
         if '_url' in request.POST:
             d = urlUnregistered(request)
+            print "Pepon"
             if d['Error'] == 'analyzing':
+                print "1"
                 return render_to_response('error/analyzing.html',
                                           RC(request))
             elif d['Error'] == 'MultiValueDict':
+                print "2"
                 error = True
                 return render_to_response('main/main.html',
                             {'error':error},
                             RC(request))
             elif d['Error'] == 'id_error':
+                print "3"
                 id_error = True
                 return render_to_response('main/main.html',
                             {'id_error':id_error},
                             RC(request))
             elif d['Error'] == 'no_exists':
+                print "4"
                 no_exists = True
                 return render_to_response('main/main.html',
                     {'no_exists':no_exists},
                     RC(request))
             else:
+                print "Pepe"
                 if d["mastery"]["points"] >= 15:
                     return render_to_response("upload/dashboard-unregistered.html", d)
                 elif d["mastery"]["points"] > 7:
@@ -238,9 +244,10 @@ def urlUnregistered(request):
                     return d
                 try:
                     d = analyzeProject(request, pathProject)
-                except:
+                except IndentationError: # FIXME
                     #There ir an error with kutz or hairball
                     #We save the project in folder called error_analyzing
+                    print "Something went wrong"
                     file.method = 'url/error'
                     file.save()
                     oldPathProject = pathProject
@@ -470,146 +477,37 @@ def analyzeProject(request, file_name):
         with open(file_name.replace(".json", ".coffee"), "w") as coffee_file:    
             coffee_file.write(data["data"])
 
-        metricMastery = "coffeelint " + file_name.replace(".json", ".coffee")
+        metricMastery = "coffeelint --reporter raw " + file_name.replace(".json", ".coffee")
         print "Running", metricMastery
-        resultMastery = os.popen(metricMastery).read()
+        try:
+            resultMastery = os.popen(metricMastery).read()
+        except:
+            print "error aqui"
         # Create a dictionary with necessary information
-        dictionary.update(procMastery(request,resultMastery))
+        dictionary.update(procMastery(request, resultMastery))
 
         return dictionary
     else:
         return HttpResponseRedirect('/')
 
-# __________________________ TRANSLATE MASTERY ______________________#
 
-def translate(request,d):
-    if request.LANGUAGE_CODE == "es":
-        dictionary = {}
-        dictionary['Abstracción'] = d['Abstraction']
-        dictionary['Paralelismo'] = d['Parallelization']
-        dictionary['Pensamiento lógico'] = d['Logic']
-        dictionary['Sincronización'] = d['Synchronization']
-        dictionary['Control de flujo'] = d['FlowControl']
-        dictionary['Interactividad con el usuario'] = d['UserInteractivity']
-        dictionary['Representación de la información'] = d['DataRepresentation']
-        #d_translate = _('%(d)s') % {'d':dictionary}
-        return dictionary
-    else:
-        return d
+# __________________________ JSON Analyzer _____________________________#
+
 
 
 # __________________________ PROCESSORS _____________________________#
 
-def procMastery(request,lines):
+def procMastery(request, lines):
     """Mastery"""
+    print "In procMastery"
     dic = {}
-    lLines = lines.split('\n')
-    d = {}
-    d = ast.literal_eval(lLines[1])
-    lLines = lLines[2].split(':')[1]
-    points = int(lLines.split('/')[0])
-    maxi = int(lLines.split('/')[1])
-
-    d_translated = translate(request,d)
-
-    dic["mastery"] = d_translated
-    dic["mastery"]["points"] = points
-    dic["mastery"]["maxi"] = maxi
+    lint_data = json.dumps(lines)
+    
+    dic["mastery"] = {}
+    dic["mastery"]["points"] = 3
+    dic["mastery"]["maxi"] = 25
     return dic
 
-
-def procDuplicateScript(lines):
-    """Return number of duplicate scripts"""
-    dic = {}
-    number = 0
-    lLines = lines.split('\n')
-    if len(lLines) > 2:
-        number = lLines[1][0]
-    dic["duplicateScript"] = dic
-    dic["duplicateScript"]["number"] = number
-    return dic
-
-
-def procSpriteNaming(lines):
-    """Return the number of default spring"""
-    dic = {}
-    lLines = lines.split('\n')
-    number = lLines[1].split(' ')[0]
-    lObjects = lLines[2:]
-    lfinal = lObjects[:-1]
-    dic['spriteNaming'] = dic
-    dic['spriteNaming']['number'] = str(number)
-    dic['spriteNaming']['sprite'] = lfinal
-    return dic
-
-
-def procDeadCode(lines):
-    """Number of dead code with characters and blocks"""
-    lLines = lines.split('\n')
-    lLines = lLines[1:]
-    lcharacter = []
-    literator = []
-    iterator = 0
-    for frame in lLines:
-        if '[kurt.Script' in frame:
-            # Found an object
-            name = frame.split("'")[1]
-            lcharacter.append(name)
-            if iterator != 0:
-                literator.append(iterator)
-                iterator = 0
-        if 'kurt.Block' in frame:
-            iterator += 1
-    literator.append(iterator)
-
-    number = len(lcharacter)
-    dic = {}
-    dic["deadCode"] = dic
-    dic["deadCode"]["number"] = number
-    for i in range(number):
-        dic["deadCode"][lcharacter[i]] = literator[i]
-
-    return dic
-
-
-def procInitialization(lines):
-    """Initialization"""
-    dic = {}
-    lLines = lines.split('.sb2')
-    d = ast.literal_eval(lLines[1])
-    keys = d.keys()
-    values = d.values()
-    items = d.items()
-    number = 0
-
-    for keys, values in items:
-        list = []
-        attribute = ""
-        internalkeys = values.keys()
-        internalvalues = values.values()
-        internalitems = values.items()
-        flag = False
-        counterFlag = False
-        i = 0
-        for internalkeys, internalvalues in internalitems:
-            if internalvalues == 1:
-                counterFlag = True
-                for value in list:
-                    if internalvalues == value:
-                        flag = True
-                if not flag:
-                    list.append(internalkeys)
-                    if len(list) < 2:
-                        attribute = str(internalkeys)
-                    else:
-                        attribute = attribute + ", " + str(internalkeys)
-        if counterFlag:
-            number = number + 1
-        d[keys] = attribute
-    dic["initialization"] = d
-    dic["initialization"]["number"] = number
-
-    return dic
 
 # _____________________ CREATE STATS OF ANALYSIS PERFORMED ___________#
 
