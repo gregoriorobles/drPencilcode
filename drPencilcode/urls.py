@@ -25,6 +25,5 @@ urlpatterns = (
     url(r'^myProjects', 'app.views.myProjects',),
     url(r'^myRoles', 'app.views.myRoles',),
     url(r'^$', 'app.views.main',),
-    url(r'^.*', 'app.views.redirectMain',),
-    
+    url(r'^.*', 'app.views.redirectMain',),   
 )

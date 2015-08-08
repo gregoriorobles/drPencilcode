@@ -3,11 +3,10 @@
 # -*- coding: utf-8 -*-
 
 
-
 from django.http import HttpResponseRedirect, HttpResponseNotFound
 from django.http import HttpResponse, HttpResponseServerError
 from django.core.context_processors import csrf
-from django.core.cache import cache  
+from django.core.cache import cache
 from django.shortcuts import render_to_response
 from django.template import RequestContext as RC
 from django.template import Context, loader
@@ -30,31 +29,33 @@ from zipfile import ZipFile
 
 # Global variables
 pMastery = "hairball -p mastery.Mastery "
-pDuplicateScript = "hairball -p duplicate.DuplicateScripts " 
+pDuplicateScript = "hairball -p duplicate.DuplicateScripts "
 pSpriteNaming = "hairball -p convention.SpriteNaming "
 pDeadCode = "hairball -p blocks.DeadCode "
 pInitialization = "hairball -p initialization.AttributeInitialization "
 
-############################ MAIN #############################
+
+# ########################### MAIN #############################
 
 def main(request):
     """Main page"""
     if request.user.is_authenticated():
-        user = request.user.username    
+        user = request.user.username
     else:
         user = None
     # The first time one user enters
     # Create the dashboards associated to users
     createDashboards()
     return render_to_response('main/main.html',
-                                {'user':user},
-                                RC(request))
+                              {'user': user},
+                              RC(request))
+
 
 def redirectMain(request):
     """Page not found redirect to main"""
     return HttpResponseRedirect('/')
 
-############################## ERROR ###############################
+# ############################# ERROR ###############################
 
 def error404(request):
     response = render_to_response('404.html', {},
@@ -62,40 +63,25 @@ def error404(request):
     response.status_code = 404
     return response
 
+
 def error505(request):
     response = render_to_response('500.html', {},
                                   context_instance = RC(request))
     return response
 
-###################### TO UNREGISTERED USER ########################
+# ##################### TO UNREGISTERED USER ########################
 
 def selector(request):
     if request.method == 'POST':
+        print request.POST
         error = False
         id_error = False
         no_exists = False
-        if "_upload" in request.POST:
-            d = uploadUnregistered(request)
-            if d['Error'] == 'analyzing':
-                return render_to_response('error/analyzing.html',
-                                          RC(request))   
-            elif d['Error'] == 'MultiValueDict':
-                error = True
-                return render_to_response('main/main.html',
-                            {'error':error},
-                            RC(request))
-            else:    
-                if d["mastery"]["points"] >= 15:
-                    return render_to_response("upload/dashboard-unregistered.html", d)
-                elif d["mastery"]["points"] > 7:
-                    return render_to_response("upload/dashboard-unregistered.html", d)
-                else:
-                    return render_to_response("upload/dashboard-unregistered.html", d)
-        elif '_url' in request.POST:
+        if '_url' in request.POST:
             d = urlUnregistered(request)
             if d['Error'] == 'analyzing':
                 return render_to_response('error/analyzing.html',
-                                          RC(request))             
+                                          RC(request))
             elif d['Error'] == 'MultiValueDict':
                 error = True
                 return render_to_response('main/main.html',
@@ -122,11 +108,10 @@ def selector(request):
         return HttpResponseRedirect('/')
 
 
-
 def handler_upload(fileSaved, counter):
     """ Necessary to uploadUnregistered"""
     # If file exists,it will save it with new name: name(x)
-    if os.path.exists(fileSaved): 
+    if os.path.exists(fileSaved):
         counter = counter + 1
         #Check the version of Scratch 1.4Vs2.0
         version = checkVersion(fileSaved)
@@ -140,11 +125,11 @@ def handler_upload(fileSaved, counter):
                 fileSaved = fileSaved.split(".")[0] + "(1).sb"
             else:
                 fileSaved = fileSaved.split('(')[0] + "(" + str(counter) + ").sb"
-        
+
 
         file_name = handler_upload(fileSaved, counter)
         return file_name
-    else:   
+    else:
         file_name = fileSaved
         return file_name
 
@@ -158,7 +143,7 @@ def checkVersion(fileName):
     return version
 
 
-#_______________________Project Analysis Project___________________#
+# _______________________Project Analysis Project___________________#
 
 def uploadUnregistered(request):
     """Upload file from form POST for unregistered users"""
@@ -184,7 +169,6 @@ def uploadUnregistered(request):
         else:
             fileSaved = dir_zips + str(fileName.id) + ".sb2"
 
-
         # Create log
         pathLog = os.path.dirname(os.path.dirname(__file__)) + "/log/"
         logFile = open (pathLog + "logFile.txt", "a")
@@ -195,14 +179,14 @@ def uploadUnregistered(request):
         # Save file in server
         counter = 0
         file_name = handler_upload(fileSaved, counter)
-        
+
         with open(file_name, 'wb+') as destination:
             for chunk in file.chunks():
                 destination.write(chunk)
 
         #Create 2.0Scratch's File
         file_name = changeVersion(request, file_name)
-    
+
         # Analyze the scratch project
         try:
             d = analyzeProject(request, file_name)
@@ -232,26 +216,26 @@ def changeVersion(request, file_name):
         file_name = file_name.split('.')[0] + '.sb2'
         return file_name
 
-#_______________________URL Analysis Project_________________________________#
+# _______________________URL Analysis Project_________________________________#
 
 
 def urlUnregistered(request):
-    """Process Request of form URL"""        
+    """Process Request of form URL"""
     if request.method == "POST":
         form = UrlForm(request.POST)
         if form.is_valid():
             url = form.cleaned_data['urlProject']
             idProject = processStringUrl(url)
+            print "Project to analyze:", idProject
             if idProject == "error":
                 d = {'Error': 'id_error'}
                 return d
             else:
-                #WHEN YOUR PROJECT DOESN'T EXIST
                 try:
-                    (pathProject, file) = sendRequestgetSB2(idProject)
-                except:
+                    (pathProject, file) = sendRequestgetJSON(idProject)
+                except: #WHEN YOUR PROJECT DOESN'T EXIST
                     d = {'Error': 'no_exists'}
-                    return d             
+                    return d
                 try:
                     d = analyzeProject(request, pathProject)
                 except:
@@ -267,49 +251,44 @@ def urlUnregistered(request):
                     d = {'Error': 'analyzing'}
                     return d
                 # Redirect to dashboard for unregistered user
-                d['Error'] = 'None'            
+                d['Error'] = 'None'
                 return d
         else:
             d = {'Error': 'MultiValueDict'}
             return  d
     else:
         return HttpResponseRedirect('/')
-                     
-                
+
+
 def processStringUrl(url):
-    """Process String of URL from Form"""
+    """Process String of URL from Form
+    
+    We allow URLs fof the type:
+    http://login.pencilcode.net/edit/project
+    
+    Responds the JSON URL
+    or "error" else
+    """
     idProject = ''
-    auxString = url.split("/")[-1]
-    if auxString == '':
-        # we need to get the other argument    
-        possibleId = url.split("/")[-2]
-        if possibleId == "#editor":
-            idProject = url.split("/")[-3]
-        else:
-            idProject = possibleId
-    else:
-        if auxString == "#editor":
-            idProject = url.split("/")[-2]
-        else:
-            # To get the id project
-            idProject = auxString
-    try:
-        checkInt = int(idProject)
-    except ValueError:
-        idProject = "error"
+    protocol, blank, server, edit, name = url.split('/')
+    if protocol != "http:":
+        return "error"
+    login, pencilcode, net = server.split('.')
+    if pencilcode != "pencilcode" or net != "net":
+        return "error"
+    idProject = protocol + '/' + blank + '/' + server + '/' + "load" + '/' + name
     return idProject
 
-def sendRequestgetSB2(idProject):
-    """First request to getSB2"""
-    getRequestSb2 = "http://getsb2-drscratch.herokuapp.com/" + idProject
-    fileURL = idProject + ".sb2"
+def sendRequestgetJSON(idProject):
+    """First request to getJSON"""
+    fileURL = idProject + ".json"
 
     # Create DB of files
     now = datetime.now()
     fileName = File (filename = fileURL, method = "url", time = now)
     fileName.save()
     dir_zips = os.path.dirname(os.path.dirname(__file__)) + "/uploads/"
-    fileSaved = dir_zips + str(fileName.id) + ".sb2"
+    fileSaved = dir_zips + str(fileName.id) + ".json"
     pathLog = os.path.dirname(os.path.dirname(__file__)) + "/log/"
     logFile = open (pathLog + "logFile.txt", "a")
     logFile.write("FileName: " + str(fileName.filename) + "\t\t\t" + "ID: " + \
@@ -320,12 +299,13 @@ def sendRequestgetSB2(idProject):
     counter = 0
     file_name = handler_upload(fileSaved, counter)
     outputFile = open(file_name, 'wb')
-    sb2File = urllib2.urlopen(getRequestSb2)
-    outputFile.write(sb2File.read())
+    print "Retrieving: ", idProject
+    jsonFile = urllib2.urlopen(idProject)
+    outputFile.write(jsonFile.read())
     outputFile.close()
     return (file_name, fileName)
 
-#________________________ LEARN MORE __________________________________#
+# ________________________ LEARN MORE __________________________________#
 
 def learn(request):
     if request.user.is_authenticated():
@@ -334,8 +314,8 @@ def learn(request):
     else:
         return render_to_response("learn/learn-unregistered.html",
                                 RC(request))
-    
-#________________________ TO REGISTERED USER __________________________#
+
+# ________________________ TO REGISTERED USER __________________________#
 
 def loginUser(request):
     """Log in app to user"""
@@ -351,7 +331,7 @@ def loginUser(request):
                     return HttpResponseRedirect('/myDashboard')
             else:
                 flag = True
-                return render_to_response("main/main.html", 
+                return render_to_response("main/main.html",
                                             {'flag': flag},
                                             context_instance=RC(request))
 
@@ -376,7 +356,7 @@ def createUser(request):
             user = User.objects.create_user(nickName, emailUser, passUser)
             return render_to_response("profile.html", {'user': user}, context_instance=RC(request))
 
-#________________________ PROFILE ____________________________# 
+# ________________________ PROFILE ____________________________#
 
 
 def updateProfile(request):
@@ -402,9 +382,7 @@ def changePassword(request, new_password):
     user.set_password(new_password)
     user.save()
 
-
-
-#________________________ DASHBOARD ____________________________# 
+# ________________________ DASHBOARD ____________________________#
 
 def createDashboards():
     """Get users and create dashboards"""
@@ -416,7 +394,7 @@ def createDashboards():
             fupdate = datetime.now()
             newDash = Dashboard(user=user.username, frelease=fupdate)
             newDash.save()
-       
+
 def myDashboard(request):
     """Dashboard page"""
     if request.user.is_authenticated():
@@ -428,7 +406,7 @@ def myDashboard(request):
         beginner = mydashboard.project_set.filter(level="beginner")
         developing = mydashboard.project_set.filter(level="developing")
         advanced = mydashboard.project_set.filter(level="advanced")
-        return render_to_response("myDashboard/content-dashboard.html", 
+        return render_to_response("myDashboard/content-dashboard.html",
                                     {'user': user,
                                     'beginner': beginner,
                                     'developing': developing,
@@ -445,22 +423,21 @@ def myProjects(request):
         user = request.user.username
         mydashboard = Dashboard.objects.get(user=user)
         projects = mydashboard.project_set.all()
-        return render_to_response("myProjects/content-projects.html", 
+        return render_to_response("myProjects/content-projects.html",
                                 {'projects': projects},
                                 context_instance=RC(request))
     else:
         return HttpResponseRedirect("/")
-    
+
 
 def myRoles(request):
     """Show the roles in Doctor Scratch"""
     if request.user.is_authenticated():
         user = request.user.username
         return render_to_response("myRoles/content-roles.html",
-                                context_instance=RC(request))   
+                                context_instance=RC(request))
     else:
-        return HttpResponseRedirect("/") 
-     
+        return HttpResponseRedirect("/")
 
 
 def myHistoric(request):
@@ -469,15 +446,15 @@ def myHistoric(request):
         user = request.user.username
         mydashboard = Dashboard.objects.get(user=user)
         projects = mydashboard.project_set.all()
-        return render_to_response("myHistoric/content-historic.html", 
+        return render_to_response("myHistoric/content-historic.html",
                                     {'projects': projects},
                                     context_instance=RC(request))
     else:
         return HttpResponseRedirect("/")
 
-#_______________________ AUTOMATIC ANALYSIS _________________________________#
+# _______________________ AUTOMATIC ANALYSIS _________________________________#
 
-def analyzeProject(request,file_name):
+def analyzeProject(request, file_name):
     dictionary = {}
     if os.path.exists(file_name):
         list_file = file_name.split('(')
@@ -485,38 +462,20 @@ def analyzeProject(request,file_name):
             file_name = list_file[0] + '\(' + list_file[1]
             list_file = file_name.split(')')
             file_name = list_file[0] + '\)' + list_file[1]
-        #Request to hairball
-        metricMastery = "hairball -p mastery.Mastery " + file_name
-        metricDuplicateScript = "hairball -p \
-                                duplicate.DuplicateScripts " + file_name
-        metricSpriteNaming = "hairball -p convention.SpriteNaming " + file_name
-        metricDeadCode = "hairball -p blocks.DeadCode " + file_name 
-        metricInitialization = "hairball -p \
-                           initialization.AttributeInitialization " + file_name
 
-        #Plug-ins not used yet
-        #metricBroadcastReceive = "hairball -p 
-        #                          checks.BroadcastReceive " + file_name
-        #metricBlockCounts = "hairball -p blocks.BlockCounts " + file_name
-        #Response from hairball
+        # Request to coffeelint
+        with open(file_name) as data_file:    
+            data = json.load(data_file)
+
+        with open(file_name.replace(".json", ".coffee"), "w") as coffee_file:    
+            coffee_file.write(data["data"])
+
+        metricMastery = "coffeelint " + file_name.replace(".json", ".coffee")
+        print "Running", metricMastery
         resultMastery = os.popen(metricMastery).read()
-        resultDuplicateScript = os.popen(metricDuplicateScript).read()
-        resultSpriteNaming = os.popen(metricSpriteNaming).read()
-        resultDeadCode = os.popen(metricDeadCode).read()
-        resultInitialization = os.popen(metricInitialization).read()
-        #Plug-ins not used yet
-        #resultBlockCounts = os.popen(metricBlockCounts).read()
-        #resultBroadcastReceive = os.popen(metricBroadcastReceive).read()
-
-        #Create a dictionary with necessary information
+        # Create a dictionary with necessary information
         dictionary.update(procMastery(request,resultMastery))
-        dictionary.update(procDuplicateScript(resultDuplicateScript))
-        dictionary.update(procSpriteNaming(resultSpriteNaming))
-        dictionary.update(procDeadCode(resultDeadCode))
-        dictionary.update(procInitialization(resultInitialization))
-        #Plug-ins not used yet
-        #dictionary.update(procBroadcastReceive(resultBroadcastReceive))
-        #dictionary.update(procBlockCounts(resultBlockCounts))
+
         return dictionary
     else:
         return HttpResponseRedirect('/')
@@ -550,13 +509,14 @@ def procMastery(request,lines):
     lLines = lLines[2].split(':')[1]
     points = int(lLines.split('/')[0])
     maxi = int(lLines.split('/')[1])
-    
+
     d_translated = translate(request,d)
 
     dic["mastery"] = d_translated
     dic["mastery"]["points"] = points
     dic["mastery"]["maxi"] = maxi
     return dic
+
 
 def procDuplicateScript(lines):
     """Return number of duplicate scripts"""
@@ -593,7 +553,7 @@ def procDeadCode(lines):
     for frame in lLines:
         if '[kurt.Script' in frame:
             # Found an object
-            name = frame.split("'")[1]         
+            name = frame.split("'")[1]
             lcharacter.append(name)
             if iterator != 0:
                 literator.append(iterator)
@@ -604,11 +564,11 @@ def procDeadCode(lines):
 
     number = len(lcharacter)
     dic = {}
-    dic["deadCode"] = dic  
+    dic["deadCode"] = dic
     dic["deadCode"]["number"] = number
     for i in range(number):
         dic["deadCode"][lcharacter[i]] = literator[i]
-  
+
     return dic
 
 
@@ -621,7 +581,7 @@ def procInitialization(lines):
     values = d.values()
     items = d.items()
     number = 0
-    
+
     for keys, values in items:
         list = []
         attribute = ""
@@ -645,15 +605,13 @@ def procInitialization(lines):
                         attribute = attribute + ", " + str(internalkeys)
         if counterFlag:
             number = number + 1
-        d[keys] = attribute      
+        d[keys] = attribute
     dic["initialization"] = d
     dic["initialization"]["number"] = number
 
     return dic
 
-
-
-#_____________________ CREATE STATS OF ANALYSIS PERFORMED ___________#
+# _____________________ CREATE STATS OF ANALYSIS PERFORMED ___________#
 
 def createStats(file_name, dictionary):
     flag = True
@@ -661,46 +619,43 @@ def createStats(file_name, dictionary):
 
     return flag
 
+# ___________________________ UNDER DEVELOPMENT _________________________#
 
-
-
-#___________________________ UNDER DEVELOPMENT _________________________#
-
-#UNDER DEVELOPMENT: Children!!!Carefull
+# UNDER DEVELOPMENT: Children!!!Carefull
 def registration(request):
     """Registration a user in the app"""
     return render_to_response("formulary.html")
 
 
-#UNDER DEVELOPMENT: Children!!!Carefull
+# UNDER DEVELOPMENT: Children!!!Carefull
 def profileSettings(request):
     """Main page for registered user"""
     return render_to_response("profile.html")
 
-#UNDER DEVELOPMENT:
-#TO REGISTERED USER
+# UNDER DEVELOPMENT:
+# TO REGISTERED USER
 def uploadRegistered(request):
     """Upload and save the zip"""
     if request.user.is_authenticated():
         user = request.user.username
     else:
         return HttpResponseRedirect('/')
-        
+
     if request.method == 'POST':
         form = UploadFileForm(request.POST)
         # Analyze the scratch project and save in our server files
         fileName = handle_uploaded_file(request.FILES['zipFile'])
         # Analize project and to save in database the metrics
-        d = analyzeProject(request,fileName)
+        d = analyzeProject(request, fileName)
         fupdate = datetime.now()
         # Get the short name
         shortName = fileName.split('/')[-1]
         # Get the dashboard of user
-        myDashboard = Dashboard.objects.get(user=user)    
+        myDashboard = Dashboard.objects.get(user=user)
         # Save the project
         newProject = Project(name=shortName, version=1, score=0, path=fileName, fupdate=fupdate, dashboard=myDashboard)
         newProject.save()
-        # Save the metrics    
+        # Save the metrics
         dmaster = d["mastery"]
         newMastery = Mastery(myproject=newProject, abstraction=dmaster["Abstraction"], paralel=dmaster["Parallelization"], logic=dmaster["Logic"], synchronization=dmaster["Synchronization"], flowcontrol=dmaster["FlowControl"], interactivity=dmaster["UserInteractivity"], representation=dmaster["DataRepresentation"], TotalPoints=dmaster["TotalPoints"])
         newMastery.save()
@@ -712,7 +667,7 @@ def uploadRegistered(request):
         else:
             newProject.level = "beginner"
         newProject.save()
-        
+
         for charx, dmetrics in d["attribute"].items():
             if charx != 'stage':
                 newAttribute = Attribute(myproject=newProject, character=charx, orientation=dmetrics["orientation"], position=dmetrics["position"], costume=dmetrics["costume"], visibility=dmetrics["visibility"], size=dmetrics["size"])
@@ -726,7 +681,7 @@ def uploadRegistered(request):
                 newDead.blocks = deadx
             newDead.save()
             iterator += 1
-        
+
         newDuplicate = Duplicate(myproject=newProject, numduplicates=d["duplicate"][0])
         newDuplicate.save()
         for charx in d["sprite"]:
@@ -734,7 +689,7 @@ def uploadRegistered(request):
             newSprite.save()
         return HttpResponseRedirect('/myprojects')
 
-#_____ ID/BUILDERS ____________#
+# _____ ID/BUILDERS ____________#
 
 def idProject(request, idProject):
     """Resource uniquemastery of project"""
@@ -753,15 +708,13 @@ def idProject(request, idProject):
     listAttribute = buildAttribute(dattribute)
     numduplicate = Duplicate.objects.filter(myproject=project)[0].numduplicates
     return render_to_response("project.html", {'project': project,
-                                                'dmastery': dmastery,
-                                                'lattribute': listAttribute,
-                                                'numduplicate': numduplicate,
-                                                'dsprite': dsprite,
-                                                'Total points': TotalPoints,
-                                                'ddead': ddead},
-                                                context_instance=RequestContext(request))
-    
-
+                                               'dmastery': dmastery,
+                                               'lattribute': listAttribute,
+                                               'numduplicate': numduplicate,
+                                               'dsprite': dsprite,
+                                               'Total points': TotalPoints,
+                                               'ddead': ddead},
+                                               context_instance=RequestContext(request))
 
 
 def buildMastery(item):
@@ -780,15 +733,16 @@ def buildAttribute(qattribute):
     # Build the dictionary
     dic = {}
     for item in qattribute:
-        dic[item.character] = {"orientation": item.orientation, 
-                                "position": item.position, 
-                                "costume": item.costume, 
-                                "visibility":item.visibility, 
-                                "size": item.size}
+        dic[item.character] = {"orientation": item.orientation,
+                               "position": item.position,
+                               "costume": item.costume,
+                               "visibility": item.visibility,
+                               "size": item.size}
     listInfo = writeErrorAttribute(dic)
     return listInfo
 
-#_______BUILDERS'S HELPERS ________#
+# _______BUILDERS'S HELPERS ________#
+
 
 def writeErrorAttribute(dic):
     """Write in a list the form correct of attribute plugin"""
@@ -817,9 +771,8 @@ def writeErrorAttribute(dic):
                 lErrors.append(text)
     return lErrors
 
-
-
 # _________________________  _______________________________ #
+
 
 def uncompress_zip(zip_file):
     unziped = ZipFile(zip_file, 'r')
@@ -827,4 +780,3 @@ def uncompress_zip(zip_file):
         if file_path == 'project.json':
             file_content = unziped.read(file_path)
     show_file(file_content)
-
