@@ -79,31 +79,25 @@ def selector(request):
         no_exists = False
         if '_url' in request.POST:
             d = urlUnregistered(request)
-            print "Pepon"
             if d['Error'] == 'analyzing':
-                print "1"
                 return render_to_response('error/analyzing.html',
                                           RC(request))
             elif d['Error'] == 'MultiValueDict':
-                print "2"
                 error = True
                 return render_to_response('main/main.html',
                             {'error':error},
                             RC(request))
             elif d['Error'] == 'id_error':
-                print "3"
                 id_error = True
                 return render_to_response('main/main.html',
                             {'id_error':id_error},
                             RC(request))
             elif d['Error'] == 'no_exists':
-                print "4"
                 no_exists = True
                 return render_to_response('main/main.html',
                     {'no_exists':no_exists},
                     RC(request))
             else:
-                print "Pepe"
                 if d["mastery"]["points"] >= 15:
                     return render_to_response("upload/dashboard-unregistered.html", d)
                 elif d["mastery"]["points"] > 7:
@@ -477,14 +471,23 @@ def analyzeProject(request, file_name):
         with open(file_name.replace(".json", ".coffee"), "w") as coffee_file:    
             coffee_file.write(data["data"])
 
-        metricMastery = "coffeelint --reporter raw " + file_name.replace(".json", ".coffee")
+        metricMastery = "python /home/grex/libresoft/2015-dbau/coffee-mastery/coffee-mastery.py " + file_name.replace(".json", ".coffee")
         print "Running", metricMastery
         try:
             resultMastery = os.popen(metricMastery).read()
         except:
-            print "error aqui"
+            print "error en mastery"
+
+        metricLint = "coffeelint --reporter raw " + file_name.replace(".json", ".coffee")
+        print "Running", metricLint
+        try:
+            resultLint = os.popen(metricLint).read()
+        except:
+            print "error en lint"
+            
         # Create a dictionary with necessary information
         dictionary.update(procMastery(request, resultMastery))
+        dictionary.update(procLint(request, resultLint))
 
         return dictionary
     else:
@@ -504,8 +507,20 @@ def procMastery(request, lines):
     lint_data = json.dumps(lines)
     
     dic["mastery"] = {}
-    dic["mastery"]["points"] = 3
-    dic["mastery"]["maxi"] = 25
+    dic["mastery"]["points"] = 5
+    dic["mastery"]["maxi"] = 21
+    return dic
+
+
+def procLint(request, lines):
+    """Lint"""
+    print "In procLint"
+    dic = {}
+    lint_data = json.dumps(lines)
+    
+    dic["lint"] = {}
+    dic["lint"]["points"] = 3
+    dic["lint"]["maxi"] = 25
     return dic
 
 
